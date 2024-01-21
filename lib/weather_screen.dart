@@ -6,6 +6,7 @@ import 'package:weather_app/additional_information_item.dart';
 import 'package:weather_app/app_id.dart';
 import 'package:weather_app/hourly_forecast_item.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -15,10 +16,12 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
+  late Future<Map<String, dynamic>> weather;
+
   @override
   void initState() {
     super.initState();
-    getCurrentWeather();
+    weather = getCurrentWeather();
   }
 
   Future<Map<String, dynamic>> getCurrentWeather() async {
@@ -50,14 +53,16 @@ class _WeatherScreenState extends State<WeatherScreen> {
         actions: [
           IconButton(
             onPressed: () {
-              setState(() {});
+              setState(() {
+                weather = getCurrentWeather();
+              });
             },
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: FutureBuilder(
-        future: getCurrentWeather(),
+        future: weather,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -161,10 +166,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       itemCount: 5,
                       itemBuilder: (context, index) {
                         final hourlyData = data['list'][index + 1];
+                        final time =
+                            DateTime.parse(hourlyData['dt_txt'].toString());
                         return HourlyForecastItem(
-                            icon: Icons.cloud_sharp,
-                            temp: hourlyData['main']['temp'].toString(),
-                            time: hourlyData['dt'].toString());
+                          icon: Icons.cloud_sharp,
+                          temp: hourlyData['main']['temp'].toString(),
+                          time: DateFormat.j().format(time),
+                        );
                       }),
                 ),
                 const SizedBox(
