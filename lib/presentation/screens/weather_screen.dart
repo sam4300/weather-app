@@ -1,12 +1,11 @@
-import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:weather_app/additional_information_item.dart';
-import 'package:weather_app/app_id.dart';
-import 'package:weather_app/hourly_forecast_item.dart';
-import 'package:http/http.dart' as http;
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:weather_app/bloc/weather_bloc.dart';
+import 'package:weather_app/presentation/widgets/additional_information_item.dart';
+import 'package:weather_app/presentation/widgets/hourly_forecast_item.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -16,29 +15,10 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  late Future<Map<String, dynamic>> weather;
-
   @override
   void initState() {
     super.initState();
-    weather = getCurrentWeather();
-  }
-
-  Future<Map<String, dynamic>> getCurrentWeather() async {
-    try {
-      String url =
-          'https://api.openweathermap.org/data/2.5/forecast?q=Kathmandu&APPID=$appId';
-      var response = await http.get(
-        Uri.parse(url),
-      );
-      final value = jsonDecode(response.body);
-      if (value['cod'] != '200') {
-        throw 'Exception occured';
-      }
-      return value;
-    } catch (e) {
-      throw e.toString();
-    }
+    context.read<WeatherBloc>().add(WeatherFetched());
   }
 
   @override
@@ -54,35 +34,34 @@ class _WeatherScreenState extends State<WeatherScreen> {
           IconButton(
             onPressed: () {
               setState(() {
-                weather = getCurrentWeather();
+                context.read<WeatherBloc>().add(
+                      WeatherFetched(),
+                    );
               });
             },
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
-      body: FutureBuilder(
-        future: weather,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: BlocBuilder<WeatherBloc, WeatherState>(
+        builder: (context, state) {
+          if (state is WeatherFailure) {
+            return Center(
+              child: Text(state.error),
+            );
+          }
+          if (state is! WeatherSuccess) {
             return const Center(
-              child: CircularProgressIndicator.adaptive(),
+              child: CircularProgressIndicator(),
             );
           }
 
-          if (snapshot.hasError) {
-            return Text(
-              snapshot.error.toString(),
-            );
-          }
-
-          final data = snapshot.data!;
-          final weatherData = data['list'][0];
-          final currentTemperature = weatherData['main']['temp'];
-          final currentSky = weatherData['weather'][0]['main'];
-          final currentHumidity = weatherData['main']['humidity'];
-          final currentPressure = weatherData['main']['pressure'];
-          final currentWind = weatherData['wind']['speed'];
+          final data = state.weather;
+          final currentTemperature = data.currentTemperature;
+          final currentSky = data.currentSky;
+          final currentHumidity = data.currentHumidity;
+          final currentPressure = data.currentPressure;
+          final currentWind = data.currentWind;
           return Padding(
             padding: const EdgeInsets.all(15),
             child: Column(
@@ -119,7 +98,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 size: 60,
                               ),
                               Text(
-                                '$currentSky',
+                                currentSky,
                                 style: const TextStyle(
                                     fontSize: 20, fontWeight: FontWeight.bold),
                               )
@@ -165,7 +144,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       scrollDirection: Axis.horizontal,
                       itemCount: 5,
                       itemBuilder: (context, index) {
-                        final hourlyData = data['list'][index + 1];
+                        final hourlyData = data.hourlyData['list'][index + 1];
                         final time =
                             DateTime.parse(hourlyData['dt_txt'].toString());
                         return HourlyForecastItem(
